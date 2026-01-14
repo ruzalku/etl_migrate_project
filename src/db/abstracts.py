@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, Sequence
+from typing import Generic, TypeVar
+
+from ..schema.obj import ObjList
 
 TClient = TypeVar("TClient")
-TObj = TypeVar("TObj")
 
 
-class AbstractStorage(ABC, Generic[TClient, TObj]):
+class AbstractStorage(ABC, Generic[TClient]):
     def __init__(self, client: TClient):
         self.client = client
 
@@ -15,11 +16,11 @@ class AbstractStorage(ABC, Generic[TClient, TObj]):
         pass
 
     @abstractmethod
-    async def save_objs(self, objs: Sequence[TObj]) -> None:
+    async def save_objs(self, objs: ObjList) -> None:
         """Сохранение объектов в storage"""
         pass
 
     @abstractmethod
-    async def get_objs(self) -> Sequence[TObj]:
+    async def get_objs(self) -> ObjList:
         """Получние объектов из storage"""
         pass

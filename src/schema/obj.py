@@ -1,5 +1,5 @@
-from typing import TypeAlias, Any
+from typing import TypeAlias, Any, Sequence
 
 
 Obj: TypeAlias = dict[str, Any]
-ObjList: TypeAlias = list[Obj]
+ObjList: TypeAlias = Sequence[Obj]

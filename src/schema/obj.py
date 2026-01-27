@@ -1,3 +1,4 @@
+"""Алиасы типов для обьектов"""
 from typing import TypeAlias, Any, Sequence
 
 

@@ -1,3 +1,4 @@
+"""Алиасы для mapping-ов"""
 from typing import TypedDict, TypeAlias
 
 

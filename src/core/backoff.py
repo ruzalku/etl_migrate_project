@@ -13,6 +13,16 @@ def backoff(
     max_attempts: int = 10,
     exceptions: tuple[type[Exception], ...] = (Exception, )
 ):
+    """
+    Декоратор для exponential backoff.
+    Следующая задержка расчитывается по формуле:
+    cur_delay = cur_delay * factor
+    delay (задержка) = cur_delay + нормальное расперделение(jitter * cur_delay)
+    
+    В начале время delay = start_time.
+    Работает до max_attempts.
+    Если cur_delay > end_time, то задержка будет end_time + нормальное распределение(jitter * cur_delay)
+    """
     def func_wrapper(func):
         @wraps(func)
         async def inner(*args, **kwargs):

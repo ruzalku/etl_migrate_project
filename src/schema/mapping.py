@@ -7,8 +7,8 @@ class FieldInfo(TypedDict):
     constraint_type: str | None
     new_column_name: str
 
-IndexMapValue: TypeAlias = FieldInfo | str
+class IndexInfo(TypedDict):
+    new_table_name: str
+    fields: dict[str, FieldInfo]
 
-IndexMap: TypeAlias = dict[str, IndexMapValue]
-
-Map: TypeAlias = dict[str, IndexMapValue]
+Map: TypeAlias = dict[str, IndexInfo]

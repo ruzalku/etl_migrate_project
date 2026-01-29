@@ -2,16 +2,17 @@ from abc import ABC, abstractmethod
 from typing import Generic, TypeVar, Any
 
 from schema.obj import ObjList
+from schema.mapping import Map
 
 TClient = TypeVar("TClient")
 
 
-class AbstractStorage(ABC, Generic[TClient]):
+class AbstractExtractor(ABC, Generic[TClient]):
     def __init__(self, client: TClient):
         self.client = client
 
     @abstractmethod
-    async def get_mapping(self, index: str) -> Any:
+    async def get_mapping(self) -> Map:
         """Получение mapping-а"""
         pass
 

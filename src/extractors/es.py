@@ -1,4 +1,5 @@
 from typing import Any, AsyncIterable, Optional
+from datetime import datetime
 
 from elasticsearch import AsyncElasticsearch, helpers
 
@@ -6,9 +7,14 @@ from abstracts.db import AsyncAbstractExtractor
 from schema.mapping import Map, FieldInfo
 from schema.obj import ObjList
 from schema.enums import Mode
+from src.crud.json_state import JSONStateManager
 
 
 class Storage(AsyncAbstractExtractor[AsyncElasticsearch]):
+    def __init__(self, state_manager: JSONStateManager | None = None, **kwargs):
+        super().__init__(**kwargs)
+        self.state_manager = state_manager
+
     async def get_mapping(self) -> Map:
         if not self.client:
             return {}
@@ -44,13 +50,17 @@ class Storage(AsyncAbstractExtractor[AsyncElasticsearch]):
 
     async def _from_response_to_data(
         self,
-        scan_generator: AsyncIterable
-    ) -> ObjList:
+        scan_generator: AsyncIterable,
+    ) -> tuple[ObjList, Any]:
         objs = []
         async for doc in scan_generator:
             obj = doc.get('_source', {})
+            if self.mode == Mode.TIMESTAMP:
+                last_state = obj.get(self.update_row)
+            elif self.mode == Mode.LOGS:
+                last_state = doc.get('_seq_no')
             objs.append(obj)
-        return objs
+        return objs, last_state
 
     async def get_objs(
         self,
@@ -80,8 +90,13 @@ class Storage(AsyncAbstractExtractor[AsyncElasticsearch]):
             sort=[{sort_field: "asc"}],
             scroll='5m'
         )
-
-        return await self._from_response_to_data(data_response)
+        
+        batch, last_state = await self._from_response_to_data(data_response)
+        
+        if self.state_manager:
+            self.state_manager.set_state(key='checkpoint', value=last_state)
+        
+        return batch
 
     def _build_timestamp_query(self, last_state: Any) -> dict:
         """Режим 'timestamp': фильтрация по дате/времени обновления"""

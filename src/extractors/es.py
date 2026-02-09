@@ -1,11 +1,11 @@
-from typing import Sequence, Any, AsyncIterable
+from typing import Any, AsyncIterable, Optional
 
 from elasticsearch import AsyncElasticsearch, helpers
-from elastic_transport import ObjectApiResponse
 
 from abstracts.db import AsyncAbstractExtractor
 from schema.mapping import Map, FieldInfo
 from schema.obj import ObjList
+from schema.enums import Mode
 
 
 class Storage(AsyncAbstractExtractor[AsyncElasticsearch]):
@@ -17,7 +17,7 @@ class Storage(AsyncAbstractExtractor[AsyncElasticsearch]):
         mappings: Map = self._from_es_to_mapping(mappings_response.raw)
 
         return mappings
-    
+
     def _from_es_to_mapping(self, es_mapping: dict[str, Any]) -> Map:
         mapping: Map = {}
         for index, index_field in es_mapping.items():
@@ -25,7 +25,7 @@ class Storage(AsyncAbstractExtractor[AsyncElasticsearch]):
 
             if not isinstance(index_field, dict):
                 continue
-            
+
             rows = index_field.get('mappings')
 
             if not isinstance(rows, dict):
@@ -39,42 +39,82 @@ class Storage(AsyncAbstractExtractor[AsyncElasticsearch]):
                     constraint_type=None,
                     new_column_name=value.get('type', '')
                 )
-                
+
         return mapping
-    
-    async def _from_response_to_data(self, scan_generator: AsyncIterable) -> ObjList:
+
+    async def _from_response_to_data(
+        self,
+        scan_generator: AsyncIterable
+    ) -> ObjList:
         objs = []
         async for doc in scan_generator:
             obj = doc.get('_source', {})
             objs.append(obj)
         return objs
-            
 
-    async def get_objs(self, batch_size: int, index: str) -> ObjList:
+    async def get_objs(
+        self,
+        index: str,
+        batch_size: int = 500,
+        last_state: Optional[Any] = None
+    ) -> ObjList:
         if not self.client:
             return []
-        
-        query = {
-            'query': {
-                'match_all': {}
-            }
-        }
+
+        query = {"query": {"match_all": {}}}
+
+        if self.cdc:
+            if self.mode == Mode.TIMESTAMP:
+                query = self._build_timestamp_query(last_state)
+            elif self.mode == Mode.LOGS:
+                query = self._build_logs_query(last_state)
+
+        sort_field = self.update_row if self.update_row else "_doc"
         
         data_response = helpers.async_scan(
             client=self.client,
             index=index,
             query=query,
-            size=batch_size
+            size=batch_size,
+            preserve_order=True,
+            sort=[{sort_field: "asc"}],
+            scroll='5m'
         )
-        
+
         return await self._from_response_to_data(data_response)
+
+    def _build_timestamp_query(self, last_state: Any) -> dict:
+        """Режим 'timestamp': фильтрация по дате/времени обновления"""
+        if not last_state:
+            return {"query": {"match_all": {}}}
+        
+        return {
+            "query": {
+                "range": {
+                    self.update_row: {"gt": last_state}
+                }
+            }
+        }
+
+    def _build_logs_query(self, last_state: Any) -> dict:
+        """Режим 'logs':  по _seq_no и работает только с включенными метаданными"""
+        if not last_state:
+            return {"query": {"match_all": {}}}
+
+        return {
+            "query": {
+                "range": {
+                    "_seq_no": {"gt": last_state}
+                }
+            }
+        }
 
     async def start(self):
         try:
             self.client = AsyncElasticsearch(**self.config)
         except (KeyError, TypeError):
             return
-        
+
     async def stop(self):
         if self.client:
             await self.client.close()

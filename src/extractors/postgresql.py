@@ -111,7 +111,10 @@ class Storage(AsyncAbstractExtractor[AsyncConnection]):
 
         async with self.client.cursor() as cur:
             await cur.execute(query, params)
-            return await cur.fetchall()  # type: ignore
+            data = await cur.fetchall()
+            if self.state_manager:
+                self.state_manager.set_state(f'pg_{index}', data[-1][self.update_row])  #type: ignore
+            return data  # type: ignore
 
     def _create_cdc_query(self, index: str, last_state: Any, batch_size: int):
         schema, table = index.split('.') if '.' in index else ('public', index)
@@ -119,7 +122,7 @@ class Storage(AsyncAbstractExtractor[AsyncConnection]):
 
         if not self.update_row:
             query = sql.SQL(
-                "SELECT * FROM {table} ORDER BY id LIMIT %s"
+                "SELECT * FROM {table} LIMIT %s"
             ).format(table=table_ident)
 
             return query, [batch_size]

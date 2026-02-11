@@ -4,10 +4,12 @@ import json
 
 from aiokafka import AIOKafkaConsumer  # type: ignore
 
+from schema.mapping import Map
 from src.abstracts.db import AsyncAbstractExtractor
 from src.schema.errors import UnsupportedMode
 from src.schema.enums import Mode
 from src.crud.json_state import JSONStateManager
+from src.core.backoff import backoff
 
 
 logger = logging.getLogger(__name__)
@@ -23,6 +25,11 @@ class Storage(AsyncAbstractExtractor[AIOKafkaConsumer]):
         self.topic: str | None = None
         self._iterator = None
         self.state_manager = state_manager
+        
+    async def get_mapping(self) -> Map:
+        """Для kafka не нужен mapping"""
+        logger.info('Пожалуйста, впишите в файл ваши названия топиков')
+        return {}
 
     async def start(self):
         self._check_mode()
@@ -39,6 +46,7 @@ class Storage(AsyncAbstractExtractor[AIOKafkaConsumer]):
             await self.client.start()
             self._iterator = self.client.__aiter__()
 
+    @backoff()
     async def get_data(self, batch_size: int, index: str):
         self.topic = index
         batch = []

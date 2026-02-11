@@ -7,6 +7,7 @@ from schema.mapping import Map, FieldInfo
 from schema.obj import ObjList
 from schema.enums import Mode
 from src.crud.json_state import JSONStateManager
+from src.core.backoff import backoff
 
 
 class Storage(AsyncAbstractExtractor[AsyncElasticsearch]):
@@ -18,6 +19,7 @@ class Storage(AsyncAbstractExtractor[AsyncElasticsearch]):
         super().__init__(**kwargs)
         self.state_manager = state_manager
 
+    @backoff()
     async def get_mapping(self) -> Map:
         if not self.client:
             return {}
@@ -65,6 +67,7 @@ class Storage(AsyncAbstractExtractor[AsyncElasticsearch]):
             objs.append(obj)
         return objs, last_state
 
+    @backoff()
     async def get_objs(
         self,
         index: str,

@@ -8,6 +8,7 @@ from src.abstracts.db import AsyncAbstractExtractor
 from src.crud.json_state import JSONStateManager
 from src.schema.enums import Mode
 from src.schema.errors import UnsupportedMode
+from src.core.backoff import backoff
 
 
 class Storage(AsyncAbstractExtractor[AsyncConnection]):
@@ -16,6 +17,7 @@ class Storage(AsyncAbstractExtractor[AsyncConnection]):
         self.state_manager = state_manager
         self.client: Optional[AsyncConnection] = None
 
+    @backoff()
     async def start(self):
         dsn = (
             f"dbname={self.config.get('dbname', 'postgres')} "
@@ -29,10 +31,12 @@ class Storage(AsyncAbstractExtractor[AsyncConnection]):
             row_factory=dict_row  # type: ignore
         )
 
+    @backoff()
     async def stop(self):
         if self.client:
             await self.client.close()
 
+    @backoff()
     async def get_mapping(self) -> Map:
         if not self.client:
             return {}
@@ -60,6 +64,7 @@ class Storage(AsyncAbstractExtractor[AsyncConnection]):
 
         return self._from_respose_to_map(response)  # type: ignore
 
+    @backoff()
     async def _get_tables_by_owner(self) -> list[str]:
         query = """
             SELECT n.nspname, c.relname
@@ -98,6 +103,7 @@ class Storage(AsyncAbstractExtractor[AsyncConnection]):
             }
         return result_map
 
+    @backoff()
     async def get_objs(
         self,
         index: str,

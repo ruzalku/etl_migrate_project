@@ -7,6 +7,7 @@ from src.abstracts.db import AsyncAbstractExtractor
 from src.crud.json_state import JSONStateManager
 from src.schema.enums import Mode
 from src.schema.errors import UnsupportedMode
+from src.core.backoff import backoff
 
 
 class SQLiteStorage(AsyncAbstractExtractor[Connection]):
@@ -15,15 +16,18 @@ class SQLiteStorage(AsyncAbstractExtractor[Connection]):
         self.state_manager = state_manager
         self.client: Optional[Connection] = None
 
+    @backoff()
     async def start(self):
         db_path = self.config.get('database', 'database.db')
         self.client = await connect(db_path)
         self.client.row_factory = Row
 
+    @backoff()
     async def stop(self):
         if self.client:
             await self.client.close()
 
+    @backoff()
     async def get_mapping(self) -> Map:
         if not self.client:
             return {}
@@ -52,6 +56,7 @@ class SQLiteStorage(AsyncAbstractExtractor[Connection]):
 
         return result_map
 
+    @backoff()
     async def get_objs(
         self,
         index: str,

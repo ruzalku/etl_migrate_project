@@ -130,12 +130,14 @@ class Storage(AsyncAbstractExtractor[AsyncElasticsearch]):
             }
         }
 
+    @backoff()
     async def start(self):
         try:
             self.client = AsyncElasticsearch(**self.config)
         except (KeyError, TypeError):
             return
 
+    @backoff()
     async def stop(self):
         if self.client:
             await self.client.close()

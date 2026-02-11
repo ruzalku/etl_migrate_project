@@ -31,6 +31,7 @@ class Storage(AsyncAbstractExtractor[AIOKafkaConsumer]):
         logger.info('Пожалуйста, впишите в файл ваши названия топиков')
         return {}
 
+    @backoff()
     async def start(self):
         self._check_mode()
         if self.client is None:
@@ -85,6 +86,7 @@ class Storage(AsyncAbstractExtractor[AIOKafkaConsumer]):
         if self.client is not None:
             await self.client.commit()
 
+    @backoff()
     async def stop(self):
         if self.client:
             await self.client.stop()

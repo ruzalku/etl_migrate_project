@@ -7,16 +7,22 @@ from aiokafka import AIOKafkaConsumer  # type: ignore
 from src.abstracts.db import AsyncAbstractExtractor
 from src.schema.errors import UnsupportedMode
 from src.schema.enums import Mode
+from src.crud.json_state import JSONStateManager
 
 
 logger = logging.getLogger(__name__)
 
 
 class Storage(AsyncAbstractExtractor[AIOKafkaConsumer]):
-    def __init__(self, **kwargs):
+    def __init__(
+        self,
+        state_manager: JSONStateManager | None = None,
+        **kwargs
+    ):
         super().__init__(**kwargs)
         self.topic: str | None = None
         self._iterator = None
+        self.state_manager = state_manager
 
     async def start(self):
         self._check_mode()

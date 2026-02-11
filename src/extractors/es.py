@@ -1,5 +1,4 @@
 from typing import Any, AsyncIterable, Optional
-from datetime import datetime
 
 from elasticsearch import AsyncElasticsearch, helpers
 
@@ -11,7 +10,11 @@ from src.crud.json_state import JSONStateManager
 
 
 class Storage(AsyncAbstractExtractor[AsyncElasticsearch]):
-    def __init__(self, state_manager: JSONStateManager | None = None, **kwargs):
+    def __init__(
+        self,
+        state_manager: JSONStateManager | None = None,
+        **kwargs
+    ):
         super().__init__(**kwargs)
         self.state_manager = state_manager
 
@@ -80,7 +83,7 @@ class Storage(AsyncAbstractExtractor[AsyncElasticsearch]):
                 query = self._build_logs_query(last_state)
 
         sort_field = self.update_row if self.update_row else "_doc"
-        
+
         data_response = helpers.async_scan(
             client=self.client,
             index=index,
@@ -90,19 +93,19 @@ class Storage(AsyncAbstractExtractor[AsyncElasticsearch]):
             sort=[{sort_field: "asc"}],
             scroll='5m'
         )
-        
+
         batch, last_state = await self._from_response_to_data(data_response)
-        
+
         if self.state_manager:
             self.state_manager.set_state(key=f'es_{index}', value=last_state)
-        
+
         return batch
 
     def _build_timestamp_query(self, last_state: Any) -> dict:
         """Режим 'timestamp': фильтрация по дате/времени обновления"""
         if not last_state:
             return {"query": {"match_all": {}}}
-        
+
         return {
             "query": {
                 "range": {

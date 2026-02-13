@@ -31,6 +31,11 @@ class AsyncAbstractExtractor(ABC, BaseStorage[TClient]):
     async def start(self):
         """Загрузка конфига в клиента"""
         pass
+    
+    @abstractmethod
+    async def stop(self):
+        """Остановка клиента"""
+        pass
 
     @abstractmethod
     async def get_mapping(self) -> Map:
@@ -49,6 +54,11 @@ class AsyncAbstractLoader(ABC, BaseStorage[TClient]):
     async def start(self):
         """Загрузка конфига в клиента"""
         pass
+    
+    @abstractmethod
+    async def stop(self):
+        """Остановка клиента"""
+        pass
 
     @abstractmethod
     async def save_objs(self, index: str, objs: ObjList):
@@ -61,6 +71,11 @@ class AbstractExtractor(ABC, BaseStorage[TClient]):
     @abstractmethod
     def start(self):
         """Загрузка конфига в клиента"""
+        pass
+    
+    @abstractmethod
+    async def stop(self):
+        """Остановка клиента"""
         pass
 
     @abstractmethod
@@ -79,6 +94,11 @@ class AbstractLoader(ABC, BaseStorage[TClient]):
     @abstractmethod
     def start(self):
         """Загрузка конфига в клиента"""
+        pass
+    
+    @abstractmethod
+    async def stop(self):
+        """Остановка клиента"""
         pass
 
     @abstractmethod

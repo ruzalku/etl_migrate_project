@@ -32,15 +32,16 @@ def backoff(
             while counter <= max_attempts:
                 try:
                     return await func(*args, **kwargs)
-                except *exceptions as e:
+                except Exception as e:
                     counter += 1
                     jitter_time = normalvariate(mu=cur_delay, sigma=jitter * cur_delay)
                     delay = cur_delay + jitter_time
                     
                     logger.error(
-                        f'Исключени: {counter}, '
+                        f'Исключение: {counter}, '
                         f'пауза: {delay}'
                     )
+                    print(e)
                     
                     await sleep(delay=delay)
                     

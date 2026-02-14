@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar, Any
 
-from schema.obj import ObjList
-from schema.mapping import Map
-from schema.enums import Mode
+from src.schema.obj import ObjList
+from src.schema.mapping import Map
+from src.schema.enums import Mode
 
 
 TClient = TypeVar("TClient")
@@ -14,6 +14,7 @@ class BaseStorage(Generic[TClient]):
         config: dict,
         cdc: bool = False,
         update_row: str = '',
+        pk_col: str = '',
         cdc_mode: Mode = Mode.TIMESTAMP,
         **kwargs
     ):

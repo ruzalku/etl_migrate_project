@@ -1,6 +1,7 @@
 import json
 import os
 from typing import Any, Optional
+from src.core.json_encoder import CustomJSONEncoder
 
 class JSONStateManager:
     def __init__(self, file_path: str = 'state.json'):
@@ -27,5 +28,5 @@ class JSONStateManager:
         data[key] = value
         temp_file = f"{self.file_path}.tmp"
         with open(temp_file, 'w') as f:
-            json.dump(data, f, indent=4)
+            json.dump(data, f, indent=4, cls=CustomJSONEncoder)
         os.replace(temp_file, self.file_path)

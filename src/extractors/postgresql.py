@@ -1,6 +1,7 @@
 from typing import Any, Optional
 from psycopg import AsyncConnection, sql
-from psycopg.rows import dict_row
+from psycopg.rows import dict_row, DictRow
+from datetime import datetime
 
 from src.schema.mapping import Map
 from src.schema.obj import ObjList
@@ -14,6 +15,7 @@ from src.core.backoff import backoff
 class Storage(AsyncAbstractExtractor[AsyncConnection]):
     def __init__(self, state_manager: JSONStateManager, **kwargs):
         super().__init__(**kwargs)
+        self.pk_col = 'ctid'
         self.state_manager = state_manager
         self.client: Optional[AsyncConnection] = None
 
@@ -103,7 +105,7 @@ class Storage(AsyncAbstractExtractor[AsyncConnection]):
             }
         return result_map
 
-    @backoff()
+
     async def get_objs(
         self,
         index: str,
@@ -118,44 +120,54 @@ class Storage(AsyncAbstractExtractor[AsyncConnection]):
         async with self.client.cursor() as cur:
             await cur.execute(query, params)
             data = await cur.fetchall()
-            if self.state_manager:
-                self.state_manager.set_state(f'pg_{index}', data[-1][self.update_row])  #type: ignore
-            return data  # type: ignore
+            
+            self._save_checkpoint(data=data, index=index)  #type: ignore
+            return self._clean_data(data=data)  # type: ignore
 
     def _create_cdc_query(self, index: str, last_state: Any, batch_size: int):
         schema, table = index.split('.') if '.' in index else ('public', index)
         table_ident = sql.Identifier(schema, table)
+        col = sql.Identifier(self.update_row)
 
         if not self.update_row:
-            query = sql.SQL(
-                "SELECT * FROM {table} LIMIT %s"
-            ).format(table=table_ident)
-
+            query = sql.SQL("SELECT * FROM {table} LIMIT %s").format(table=table_ident)
             return query, [batch_size]
 
-        if self.mode == Mode.TIMESTAMP:
-            if not last_state:
-                query = sql.SQL(
-                    "SELECT * FROM {table} ORDER BY {col} LIMIT %s"
-                ).format(
-                    table=table_ident, col=sql.Identifier(self.update_row)
-                )
+        if self.mode != Mode.TIMESTAMP:
+            raise UnsupportedMode(f'{self.mode}: Неподдерживаемый режим работы')
 
-                return query, [batch_size]
+        if not last_state:
+            query = sql.SQL("""
+                SELECT *, ctid FROM {table} 
+                ORDER BY {col}, ctid LIMIT %s
+            """).format(table=table_ident, col=col)
+            return query, [batch_size]
 
-            query = sql.SQL(
-                "SELECT * FROM {table} WHERE {col} > %s ORDER BY {col} LIMIT %s"
-            ).format(
-                table=table_ident, col=sql.Identifier(self.update_row)
+        ts, prev_ctid = last_state
+        query = sql.SQL("""
+            SELECT *, ctid FROM {table} 
+            WHERE ({col} > %s) OR ({col} = %s AND ctid > %s)
+            ORDER BY {col}, ctid LIMIT %s
+        """).format(table=table_ident, col=col)
+
+        return query, [ts, ts, prev_ctid, batch_size]
+    
+    def _save_checkpoint(self, data: list[DictRow], index: str):
+        if self.state_manager and self.cdc and data and self.update_row:
+            last_row = data[-1]
+
+            cp = (
+                last_row[self.update_row],
+                last_row['ctid']
             )
 
-            return query, [last_state, batch_size]
-
-        if self.mode == Mode.LOGS:
-            raise UnsupportedMode(
-                'LOGS: Неподдерживаемый режим работы'
-            )
-
-        raise UnsupportedMode(
-            f'{self.mode}: Неподдерживаемый режим работы'
-        )
+            self.state_manager.set_state(f'pg_{index}', cp)
+            
+    def _clean_data(self, data: list[DictRow]):
+        clean_data = []
+        for row in data:
+            row_copy = dict(row)
+            row_copy.pop('ctid', None)
+            clean_data.append(row_copy)
+            
+        return clean_data

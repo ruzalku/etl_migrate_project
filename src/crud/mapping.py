@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 from abstracts.crud import AbstractCRUD
 from abstracts.db import AbstractExtractor
@@ -19,13 +20,6 @@ class MappingCRUD(AbstractCRUD):
         map_index = map.get(index, None)
         
         return map_index
-    
-    async def save_obj(self, obj: dict) -> bool:
-        mapping = self.extractor.get_mapping()
-        try:
-            with open(self.path, mode='w', encoding='utf-8') as file:
-                json.dump(obj, file)
-        except PermissionError:
-            return False
-        
+
+    async def save_obj(self, index: str, obj: Any) -> bool:
         return True

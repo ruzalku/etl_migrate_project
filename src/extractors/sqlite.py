@@ -1,7 +1,7 @@
 from aiosqlite import Row, Connection, connect
 from typing import Any, Optional
 
-from src.schema.mapping import Map
+from src.schema.mapping import Map, FieldInfo
 from src.schema.obj import ObjList
 from src.abstracts.db import AsyncAbstractExtractor
 from src.crud.json_state import JSONStateManager
@@ -26,35 +26,6 @@ class SQLiteStorage(AsyncAbstractExtractor[Connection]):
     async def stop(self):
         if self.client:
             await self.client.close()
-
-    @backoff()
-    async def get_mapping(self) -> Map:
-        if not self.client:
-            return {}
-
-        query = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"
-
-        async with self.client.execute(query) as cursor:
-            tables = await cursor.fetchall()
-
-        result_map: Map = {}
-        for table_row in tables:
-            table_name = table_row['name']
-            result_map[table_name] = {
-                'new_table_name': table_name,
-                'fields': {}
-            }
-
-            async with self.client.execute(f"PRAGMA table_info({table_name})") as cursor:
-                columns = await cursor.fetchall()
-                for col in columns:
-                    result_map[table_name]['fields'][col['name']] = {
-                        'data_type': col['type'],
-                        'constraint_type': 'PK' if col['pk'] else None,
-                        'new_column_name': col['name']
-                    }
-
-        return result_map
 
     @backoff()
     async def get_objs(

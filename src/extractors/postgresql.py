@@ -3,7 +3,7 @@ from psycopg import AsyncConnection, sql
 from psycopg.rows import dict_row, DictRow
 from datetime import datetime
 
-from src.schema.mapping import Map
+from src.schema.mapping import Map, FieldInfo
 from src.schema.obj import ObjList
 from src.abstracts.db import AsyncAbstractExtractor
 from src.crud.json_state import JSONStateManager
@@ -39,73 +39,6 @@ class Storage(AsyncAbstractExtractor[AsyncConnection]):
             await self.client.close()
 
     @backoff()
-    async def get_mapping(self) -> Map:
-        if not self.client:
-            return {}
-
-        tables = await self._get_tables_by_owner()
-        if not tables:
-            return {}
-
-        query = """
-            SELECT table_schema, table_name, column_name, data_type
-            FROM information_schema.columns
-            WHERE (table_schema, table_name) IN ({})
-        """
-
-        table_tuples = [tuple(t.split('.')) for t in tables]
-        placeholders = sql.SQL(', ').join(
-            [sql.Placeholder()] * len(table_tuples)
-        )
-
-        final_query = sql.SQL(query).format(placeholders)
-
-        async with self.client.cursor() as cur:
-            await cur.execute(final_query, table_tuples)
-            response = await cur.fetchall()
-
-        return self._from_respose_to_map(response)  # type: ignore
-
-    @backoff()
-    async def _get_tables_by_owner(self) -> list[str]:
-        query = """
-            SELECT n.nspname, c.relname
-            FROM pg_class c
-            JOIN pg_namespace n ON c.relnamespace = n.oid
-            JOIN pg_roles r ON c.relowner = r.oid
-            WHERE c.relkind = 'r'
-            AND n.nspname NOT IN ('pg_catalog', 'information_schema')
-            AND r.rolname = %s;
-        """
-        if not self.client:
-            return []
-
-        async with self.client.cursor() as cur:
-            user = self.config.get('user', 'postgres')
-            await cur.execute(query, (user,))
-            rows = await cur.fetchall()
-
-        return [f"{row['nspname']}.{row['relname']}" for row in rows]  # type: ignore
-
-    def _from_respose_to_map(self, rows: list[dict]) -> Map:
-        result_map: Map = {}
-        for row in rows:
-            full_name = f"{row['table_schema']}.{row['table_name']}"
-
-            if full_name not in result_map:
-                result_map[full_name] = {
-                    'new_table_name': row['table_name'],
-                    'fields': {}
-                }
-
-            result_map[full_name]['fields'][row['column_name']] = {
-                'data_type': row['data_type'],
-                'constraint_type': None,
-                'new_column_name': row['column_name']
-            }
-        return result_map
-
-
     async def get_objs(
         self,
         index: str,

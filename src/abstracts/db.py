@@ -39,11 +39,6 @@ class AsyncAbstractExtractor(ABC, BaseStorage[TClient]):
         pass
 
     @abstractmethod
-    async def get_mapping(self) -> Map:
-        """Получение mapping-а"""
-        pass
-
-    @abstractmethod
     async def get_objs(self) -> ObjList:
         """Получние объектов из storage"""
         pass
@@ -77,11 +72,6 @@ class AbstractExtractor(ABC, BaseStorage[TClient]):
     @abstractmethod
     async def stop(self):
         """Остановка клиента"""
-        pass
-
-    @abstractmethod
-    def get_mapping(self) -> Map:
-        """Получение mapping-а"""
         pass
 
     @abstractmethod

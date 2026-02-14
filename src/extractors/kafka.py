@@ -25,11 +25,6 @@ class Storage(AsyncAbstractExtractor[AIOKafkaConsumer]):
         self.topic: str | None = None
         self._iterator = None
         self.state_manager = state_manager
-        
-    async def get_mapping(self) -> Map:
-        """Для kafka не нужен mapping"""
-        logger.info('Пожалуйста, впишите в файл ваши названия топиков')
-        return {}
 
     @backoff()
     async def start(self):

@@ -13,7 +13,7 @@ class JSONStateManager:
         try:
             with open(self.file_path, 'r') as f:
                 return json.load(f).get(key)
-        except (json.JSONDecodeError, IOError):
+        except (json.JSONDecodeError, IOError, AttributeError):
             return None
 
     def set_state(self, key: str, value: Any):

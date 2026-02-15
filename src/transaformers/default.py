@@ -9,6 +9,8 @@ from datetime import datetime
 from src.schema.mapping import IndexInfo, FieldInfo
 from src.core.backoff import backoff
 from src.schema.errors import ValidationError
+from src.abstracts.transform import AbstractTransform
+from src.schema.obj import ObjList
 
 logger = logging.getLogger(__name__)
 
@@ -21,17 +23,15 @@ class FilterOp(str, Enum):
     EQUAL = "$equal"
 
 
-class DataTransformer:
-    """Трансформер данных PostgreSQL -> MongoDB"""
-    
+class DataTransformer(AbstractTransform):
     def __init__(self):
         self._df_cache: Optional[pd.DataFrame] = None
         
     def transform(
         self, 
         index_config: IndexInfo, 
-        batch_data: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        batch_data: ObjList
+    ) -> ObjList:
         """Основной метод трансформации батча данных"""
         if not batch_data:
             logger.debug("Пустой батч данных")
@@ -44,7 +44,7 @@ class DataTransformer:
         logger.info(f"Трансформировано {len(result)} записей из {len(batch_data)}")
         return result
 
-    def _prepare_dataframe(self, batch_data: List[Dict[str, Any]]) -> pd.DataFrame:
+    def _prepare_dataframe(self, batch_data: ObjList) -> pd.DataFrame:
         """Создает DataFrame и применяет авто-конвертацию datetime"""
         df = pd.DataFrame(batch_data)
         self._auto_convert_datetime(df)

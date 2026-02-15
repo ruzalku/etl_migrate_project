@@ -4,6 +4,7 @@ from typing import Generic, TypeVar, Any
 from src.schema.obj import ObjList
 from src.schema.mapping import Map
 from src.schema.enums import Mode
+from src.crud.json_state import JSONStateManager
 
 
 TClient = TypeVar("TClient")
@@ -11,6 +12,7 @@ TClient = TypeVar("TClient")
 class BaseStorage(Generic[TClient]):
     def __init__(
         self,
+        state_manager: JSONStateManager,
         config: dict,
         cdc: bool = False,
         update_row: str = '',
@@ -25,6 +27,7 @@ class BaseStorage(Generic[TClient]):
         self.update_row = update_row
         self.mode = cdc_mode
         self.pk_col = pk_col
+        self.state_manager = state_manager
 
 
 class AsyncAbstractExtractor(ABC, BaseStorage[TClient]):
@@ -40,7 +43,7 @@ class AsyncAbstractExtractor(ABC, BaseStorage[TClient]):
         pass
 
     @abstractmethod
-    async def get_objs(self, index: str) -> ObjList:
+    async def get_objs(self, index: str, last_state: Any) -> ObjList:
         """Получние объектов из storage"""
         pass
     
@@ -76,7 +79,7 @@ class AbstractExtractor(ABC, BaseStorage[TClient]):
         pass
 
     @abstractmethod
-    def get_objs(self, index: str) -> ObjList:
+    def get_objs(self, index: str, last_state: Any) -> ObjList:
         """Получние объектов из storage"""
         pass
     

@@ -75,13 +75,14 @@ class PipelineOrchestrator:
             loader = self._create_instances(
                 loader_module,
                 "Loader", 
-                configs["loader"]
+                configs["loader"],
+                state_manager=JSONStateManager(f"state_{index_name}.json")
             )
 
             transform = self._create_instances(
                 transform_module,
                 "DataTransformer",
-                configs["transform"]
+                configs["transform"],
             )
 
             worker = DataWorker(

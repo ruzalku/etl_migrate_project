@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 
 from src.schema.mapping import Map, IndexInfo
 from src.crud.mapping import MappingCRUD
@@ -40,30 +41,33 @@ class DataWorker:
             else:
                 self.loader.start()
                 
-            if asyncio.iscoroutinefunction(self.extractor.get_objs):
-                objs = await self.extractor.get_objs(self.index_name)
-            else:
-                objs = self.extractor.get_objs(self.index_name)
+            last_state = self.extractor.state_manager.get_state(self.index_name)
                 
-            print(objs)
+            while True:
+                if asyncio.iscoroutinefunction(self.extractor.get_objs):
+                    objs = await self.extractor.get_objs(index=self.index_name, last_state=last_state)
+                else:
+                    objs = self.extractor.get_objs(index=self.index_name, last_state=last_state)
+
+
+                if not objs and not self.extractor.cdc:
+                    self.logger.info(f"Нет данных для индекса {self.index_name}")
+                    return True
+
+                transformed_objs = self.transform.transform(
+                    index_config=self.index_info,
+                    batch_data=objs  #type: ignore
+                )
+
+                if asyncio.iscoroutinefunction(self.loader.save_objs):
+                    await self.loader.save_objs(self.index_name, transformed_objs)
+                else:
+                    self.loader.save_objs(self.index_name, transformed_objs)
+
+                self.logger.info(f"Обработано {len(transformed_objs)} объектов для индекса {self.index_name}")
+                last_state = self.extractor.state_manager.get_state(self.index_name)
+                time.sleep(1)
                 
-            if not objs:
-                self.logger.info(f"Нет данных для индекса {self.index_name}")
-                return True
-                
-            transformed_objs = self.transform.transform(
-                index_config=self.index_info,
-                batch_data=objs  #type: ignore
-            )
-            print(f'{transformed_objs=}')
-            
-            if asyncio.iscoroutinefunction(self.loader.save_objs):
-                await self.loader.save_objs(self.index_name, transformed_objs)
-            else:
-                self.loader.save_objs(self.index_name, transformed_objs)
-                
-            self.logger.info(f"Обработано {len(transformed_objs)} объектов для индекса {self.index_name}")
-            return True
             
         except Exception as e:
             self.logger.error(f"Ошибка обработки индекса {self.index_name}: {e}")

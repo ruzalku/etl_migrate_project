@@ -13,10 +13,9 @@ from src.core.backoff import backoff
 
 
 class Storage(AsyncAbstractExtractor[AsyncConnection]):
-    def __init__(self, state_manager: JSONStateManager, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.pk_col = 'ctid'
-        self.state_manager = state_manager
         self.client: Optional[AsyncConnection] = None
 
     @backoff()
@@ -86,7 +85,7 @@ class Storage(AsyncAbstractExtractor[AsyncConnection]):
         return query, [ts, ts, prev_ctid, batch_size]
     
     def _save_checkpoint(self, data: list[DictRow], index: str):
-        if self.state_manager and self.cdc and data and self.update_row:
+        if self.state_manager and data and self.update_row:
             last_row = data[-1]
 
             cp = (
@@ -94,7 +93,7 @@ class Storage(AsyncAbstractExtractor[AsyncConnection]):
                 last_row['ctid']
             )
 
-            self.state_manager.set_state(f'pg_{index}', cp)
+            self.state_manager.set_state(f'{index}', cp)
             
     def _clean_data(self, data: list[DictRow]):
         clean_data = []

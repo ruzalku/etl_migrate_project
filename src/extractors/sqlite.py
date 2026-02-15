@@ -44,7 +44,7 @@ class SQLiteStorage(AsyncAbstractExtractor[Connection]):
             data = [dict(row) for row in rows]
 
         if data and self.update_row:
-            self.state_manager.set_state(f'sqlite_{index}', data[-1][self.update_row])
+            self.state_manager.set_state(f'{index}', data[-1][self.update_row])
 
         return data  # type: ignore
 

@@ -66,7 +66,7 @@ class Storage(AsyncAbstractExtractor[AsyncElasticsearch]):
         batch, last_state = await self._from_response_to_data(data_response)
 
         if self.state_manager:
-            self.state_manager.set_state(key=f'es_{index}', value=last_state)
+            self.state_manager.set_state(key=f'{index}', value=last_state)
 
         return batch
 

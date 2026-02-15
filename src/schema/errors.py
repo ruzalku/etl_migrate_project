@@ -3,3 +3,6 @@ class UnsupportedMode(Exception):
 
 class OnlyCDC(Exception):
     pass
+
+class ValidationError(Exception):
+    pass

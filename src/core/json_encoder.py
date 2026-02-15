@@ -13,5 +13,3 @@ class CustomJSONEncoder(JSONEncoder):
             return str(o)
         
         return JSONEncoder.default(self, o)
-        
-        return o

@@ -53,7 +53,7 @@ class DataTransformer(AbstractTransform):
         return df
 
     def _auto_convert_datetime(self, df: pd.DataFrame) -> None:
-        """✅ БЕЗОПАСНАЯ авто-конвертация datetime"""
+        """Авто-конвертация datetime"""
         if df.empty:
             return
             
@@ -66,7 +66,7 @@ class DataTransformer(AbstractTransform):
                     logger.warning(f"Не удалось конвертировать {col}: {e}")
 
     def _is_datetime_column(self, df: pd.DataFrame, col: str) -> bool:
-        """✅ ИСПРАВЛЕНО - безопасная проверка datetime"""
+        """Проверка datetime"""
         if df.empty or col not in df.columns:
             return 'time' in col.lower()
             
@@ -103,7 +103,7 @@ class DataTransformer(AbstractTransform):
         df: pd.DataFrame, 
         index_config: IndexInfo
     ) -> List[Dict[str, Any]]:
-        """✅ ИСПРАВЛЕНО - безопасная трансформация полей"""
+        """Трансформация полей"""
         result_records = []
         fields_config = index_config["fields"]
         
@@ -132,7 +132,7 @@ class DataTransformer(AbstractTransform):
         row_idx: int, 
         options: Dict[str, Any]
     ) -> Any:
-        """✅ ИСПРАВЛЕНО - поддержка строк и списков"""
+        """Поддержка строк и списков"""
         try:
             if "$copy" in options:
                 return self._copy_field(row, options["$copy"])
@@ -185,20 +185,16 @@ class DataTransformer(AbstractTransform):
         row_idx: int, 
         agg_type: str
     ) -> Any:
-        """✅ ИСПРАВЛЕНО - принимает DataFrame И Series"""
         try:
-            # Если DataFrame - берем первую колонку или агрегируем
             if isinstance(data, pd.DataFrame):
                 if len(data.columns) == 1:
-                    data = data.iloc[:, 0]  # Первая колонка → Series
+                    data = data.iloc[:, 0]
                 else:
-                    # Несколько колонок - агрегация по батчу
                     if agg_type == "max":
                         return data.max(axis=1).iloc[row_idx] if len(data) > row_idx else None
                     elif agg_type == "min":
                         return data.min(axis=1).iloc[row_idx] if len(data) > row_idx else None
 
-            # Теперь data гарантированно Series
             if isinstance(data, pd.Series) and len(data) > row_idx:
                 if agg_type == "max":
                     return data.iloc[:row_idx+1].max() if row_idx >= 0 else data.max()
@@ -211,7 +207,6 @@ class DataTransformer(AbstractTransform):
             return None
 
     def _serialize_value(self, value: Any) -> Any:
-        """✅ ИСПРАВЛЕНО - безопасная сериализация"""
         if pd.isna(value) or value is None or value is np.nan:
             return None
         if hasattr(value, 'isoformat'):
@@ -222,7 +217,6 @@ class DataTransformer(AbstractTransform):
 
     @staticmethod
     def _make_json_serializable(record: Dict[str, Any]) -> Dict[str, Any]:
-        """Финальная сериализация для MongoDB"""
         safe_record = {}
         for key, value in record.items():
             safe_record[key] = DataTransformer._serialize_final(value)
@@ -230,7 +224,6 @@ class DataTransformer(AbstractTransform):
 
     @staticmethod
     def _serialize_final(value: Any) -> Any:
-        """✅ ИСПРАВЛЕНО - финальная сериализация"""
         if pd.isna(value) or value is None or value is np.nan:
             return None
         elif isinstance(value, (pd.Timestamp, datetime)):
@@ -250,7 +243,7 @@ class DataTransformer(AbstractTransform):
         df: pd.DataFrame, 
         filter_expr: Dict[str, Any]
     ) -> pd.Series:
-        """✅ ИСПРАВЛЕНО - рекурсивная обработка фильтров"""
+        """Рекурсивная обработка фильтров"""
         if df.empty:
             return pd.Series([], dtype=bool)
             
@@ -280,7 +273,7 @@ class DataTransformer(AbstractTransform):
         df: pd.DataFrame, 
         filter_cond: Dict[str, Any]
     ) -> pd.Series:
-        """✅ ИСПРАВЛЕНО - простой фильтр"""
+        """Простой фильтр"""
         if df.empty:
             return pd.Series([], dtype=bool)
             
@@ -299,13 +292,11 @@ class DataTransformer(AbstractTransform):
         return self._apply_operator(col_series, op, compare_value)
 
     def _prepare_compare_value(self, series: pd.Series, value: Any) -> Any:
-        """✅ ИСПРАВЛЕНО - безопасная подготовка значения сравнения"""
         try:
             if pd.api.types.is_datetime64_any_dtype(series):
                 result = pd.to_datetime(value, errors='coerce')
                 if pd.isna(result):
                     return pd.NaT
-                # ✅ Используем dtype.tz вместо series.dt.tz
                 if series.dtype.tz is not None and result.tz is None:  #type: ignore
                     result = result.tz_localize('UTC')
                 elif series.dtype.tz is not None and result.tz is not None:  #type: ignore
@@ -323,7 +314,6 @@ class DataTransformer(AbstractTransform):
         op: str, 
         value: Any
     ) -> pd.Series:
-        """✅ ИСПРАВЛЕНО - всегда возвращает Series"""
         try:
             if pd.isna(value):
                 return pd.Series([False] * len(series), index=series.index)

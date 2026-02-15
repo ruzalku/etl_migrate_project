@@ -127,11 +127,27 @@ $equal: {
 
 - *Переменная configs:*
 
-В ```config``` указать данные для подключения к БД.
+    - *Настройка для extractor:*
+        В ```config``` указать данные для подключения к БД.
 
-- *Настройка для extractor:*
+        - ```"update_row": "created_at"``` - Колонка для Timestamp CDC
+        - ```"pk_col": "ctid"``` - PK для столбца (по умолчанию стоит для postgresql системный)
+        - ```"cdc": True``` - Включение/выключени CDC
+        - ```"cdc_mode": Mode.TIMESTAMP``` - Режим работы CDC
 
-"update_row": "created_at",
-"pk_col": "ctid" - PK для столбца (по умолчанию стоит для postgresql системный)
-"cdc": True - Включение/выключени CDC
-"cdc_mode": Mode.TIMESTAMP
+    - *Настройка для loader:*
+        В ```config``` указать данные для подключения к БД.
+
+        - ```"db_name": "db name"``` - Название БД
+
+    - *Настройка для transformer:*
+        ```config``` - указать пустым (то есть '{}')
+
+---
+
+- *Переменные в run_pipeline*
+    - ```loader_module="src.loaders.mongodb"``` - Путь до модуля loader, где содержится нужный плагин
+    - ```extractor_module="src.extractors.postgresql"``` - Путь до модуля extractor, где содержится нужный плагин
+    - ```transform_module="src.transaformers.default"``` - Путь до модуля transformer, где содержится нужный плагин
+    - ```configs=configs``` - Тут указывается конфиг для БД
+    - ```mapping_path="mapping.json"``` - Путь до mapping-а

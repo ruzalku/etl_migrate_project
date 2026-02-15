@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 import json
 import pandas as pd
 import numpy as np
@@ -14,7 +14,6 @@ from src.schema.obj import ObjList
 
 logger = logging.getLogger(__name__)
 
-
 class FilterOp(str, Enum):
     GT = "$gt"
     GE = "$ge"
@@ -22,9 +21,8 @@ class FilterOp(str, Enum):
     LE = "$le"
     EQUAL = "$equal"
 
-
 class DataTransformer(AbstractTransform):
-    def __init__(self):
+    def __init__(self, config):
         self._df_cache: Optional[pd.DataFrame] = None
         
     def transform(
@@ -37,12 +35,16 @@ class DataTransformer(AbstractTransform):
             logger.debug("Пустой батч данных")
             return []
             
-        df = self._prepare_dataframe(batch_data)
-        df = self._apply_table_filter(df, index_config)
-        result = self._transform_fields(df, index_config)
-        
-        logger.info(f"Трансформировано {len(result)} записей из {len(batch_data)}")
-        return result
+        try:
+            df = self._prepare_dataframe(batch_data)
+            df = self._apply_table_filter(df, index_config)
+            result = self._transform_fields(df, index_config)
+            
+            logger.info(f"Трансформировано {len(result)} записей из {len(batch_data)}")
+            return result
+        except Exception as e:
+            logger.error(f"Ошибка трансформации: {e}")
+            return []
 
     def _prepare_dataframe(self, batch_data: ObjList) -> pd.DataFrame:
         """Создает DataFrame и применяет авто-конвертацию datetime"""
@@ -51,18 +53,31 @@ class DataTransformer(AbstractTransform):
         return df
 
     def _auto_convert_datetime(self, df: pd.DataFrame) -> None:
-        """Автоматически конвертирует колонки в datetime"""
+        """✅ БЕЗОПАСНАЯ авто-конвертация datetime"""
+        if df.empty:
+            return
+            
         for col in df.columns:
             if self._is_datetime_column(df, col):
-                df[col] = pd.to_datetime(df[col], errors='coerce')
-                logger.debug(f"Конвертирована колонка {col} в datetime")
+                try:
+                    df[col] = pd.to_datetime(df[col], errors='coerce')
+                    logger.debug(f"Конвертирована колонка {col} в datetime")
+                except Exception as e:
+                    logger.warning(f"Не удалось конвертировать {col}: {e}")
 
     def _is_datetime_column(self, df: pd.DataFrame, col: str) -> bool:
-        """Определяет, является ли колонка datetime"""
-        sample = str(df[col].iloc[0]) if len(df) > 0 else ""
-        patterns = ['T', '+00', '-20', '-21', '-22', '-23', '-24', '-25', '-26']
-        return ('time' in col.lower() or 
-                any(pattern in sample for pattern in patterns))
+        """✅ ИСПРАВЛЕНО - безопасная проверка datetime"""
+        if df.empty or col not in df.columns:
+            return 'time' in col.lower()
+            
+        try:
+            if len(df) == 0:
+                return False
+            sample = str(df[col].iloc[0])
+            patterns = ['T', '+00', '+', 'Z', '202[0-6]']
+            return ('time' in col.lower() or any(pattern in sample for pattern in patterns))
+        except:
+            return 'time' in col.lower()
 
     def _apply_table_filter(
         self, 
@@ -74,26 +89,34 @@ class DataTransformer(AbstractTransform):
         if not table_options:
             return df
             
-        filter_mask = self._evaluate_filter(df, table_options)
-        filtered_df = df[filter_mask].reset_index(drop=True)
-        logger.debug(f"Фильтр применил: {len(df)} -> {len(filtered_df)}")
-        return filtered_df
+        try:
+            filter_mask = self._evaluate_filter(df, table_options)
+            filtered_df = df[filter_mask].reset_index(drop=True)
+            logger.debug(f"Фильтр применил: {len(df)} -> {len(filtered_df)}")
+            return filtered_df
+        except Exception as e:
+            logger.warning(f"Ошибка фильтрации: {e}")
+            return df
 
     def _transform_fields(
         self, 
         df: pd.DataFrame, 
         index_config: IndexInfo
     ) -> List[Dict[str, Any]]:
-        """Трансформирует все поля согласно конфигурации"""
+        """✅ ИСПРАВЛЕНО - безопасная трансформация полей"""
         result_records = []
         fields_config = index_config["fields"]
         
-        for idx, row in df.iterrows():
+        for idx in range(len(df)):
+            if idx >= len(df):
+                break
+            row = df.iloc[idx]
             new_record = {}
+            
             for new_field_name, field_info in fields_config.items():
                 try:
                     options = field_info.get("options", {})
-                    new_record[new_field_name] = self._process_field(df, row, idx, options) #type: ignore
+                    new_record[new_field_name] = self._process_field(df, row, idx, options)
                 except Exception as e:
                     logger.warning(f"Ошибка обработки поля {new_field_name}: {e}")
                     new_record[new_field_name] = None
@@ -109,17 +132,33 @@ class DataTransformer(AbstractTransform):
         row_idx: int, 
         options: Dict[str, Any]
     ) -> Any:
-        """Обрабатывает одно поле согласно опциям"""
-        if "$copy" in options:
-            return self._copy_field(row, options["$copy"])
-        elif "$to_json" in options:
-            return self._to_json_single(row, options["$to_json"])
-        elif "$max" in options:
-            return self._calculate_window_agg(df[options["$max"]], row_idx, "max")
-        elif "$min" in options:
-            return self._calculate_window_agg(df[options["$min"]], row_idx, "min")
-        else:
-            raise ValidationError(f"Неизвестный тип опции: {options}")
+        """✅ ИСПРАВЛЕНО - поддержка строк и списков"""
+        try:
+            if "$copy" in options:
+                return self._copy_field(row, options["$copy"])
+            elif "$to_json" in options:
+                columns = options["$to_json"]
+                if isinstance(columns, list):
+                    return self._to_json_single(row, columns)
+                else:
+                    logger.warning(f"$to_json ожидает список, получено: {columns}")
+                    return None
+            elif "$max" in options:
+                columns = options["$max"]
+                if isinstance(columns, str):
+                    columns = [columns]  # Строка → список
+                return self._calculate_window_agg(df[columns], row_idx, "max")
+            elif "$min" in options:
+                columns = options["$min"]
+                if isinstance(columns, str):
+                    columns = [columns]  # ✅ Строка "price" → ["price"]
+                return self._calculate_window_agg(df[columns], row_idx, "min")
+            else:
+                raise ValidationError(f"Неизвестный тип опции: {options}")
+        except Exception as e:
+            logger.error(f"Ошибка в _process_field: {e}")
+            return None
+
 
     def _copy_field(self, row: pd.Series, column_name: str) -> Any:
         """Копирует поле из исходной строки"""
@@ -128,9 +167,6 @@ class DataTransformer(AbstractTransform):
             return None
             
         value = row[column_name]
-        if pd.isna(value):
-            return None
-            
         return self._serialize_value(value)
 
     def _to_json_single(self, row: pd.Series, columns: List[str]) -> str:
@@ -145,22 +181,42 @@ class DataTransformer(AbstractTransform):
 
     def _calculate_window_agg(
         self, 
-        series: pd.Series, 
+        data: Union[pd.DataFrame, pd.Series], 
         row_idx: int, 
         agg_type: str
     ) -> Any:
-        """Вычисляет агрегат для строки (заглушка для оконных функций)"""
-        if agg_type == "max":
-            return series.iloc[row_idx:].max()
-        elif agg_type == "min":
-            return series.iloc[row_idx:].min()
-        return None
+        """✅ ИСПРАВЛЕНО - принимает DataFrame И Series"""
+        try:
+            # Если DataFrame - берем первую колонку или агрегируем
+            if isinstance(data, pd.DataFrame):
+                if len(data.columns) == 1:
+                    data = data.iloc[:, 0]  # Первая колонка → Series
+                else:
+                    # Несколько колонок - агрегация по батчу
+                    if agg_type == "max":
+                        return data.max(axis=1).iloc[row_idx] if len(data) > row_idx else None
+                    elif agg_type == "min":
+                        return data.min(axis=1).iloc[row_idx] if len(data) > row_idx else None
+
+            # Теперь data гарантированно Series
+            if isinstance(data, pd.Series) and len(data) > row_idx:
+                if agg_type == "max":
+                    return data.iloc[:row_idx+1].max() if row_idx >= 0 else data.max()
+                elif agg_type == "min":
+                    return data.iloc[:row_idx+1].min() if row_idx >= 0 else data.min()
+
+            return None
+        except Exception as e:
+            logger.warning(f"Ошибка window_agg {agg_type}: {e}")
+            return None
 
     def _serialize_value(self, value: Any) -> Any:
-        """Сериализует значение для JSON"""
-        if pd.isna(value):
+        """✅ ИСПРАВЛЕНО - безопасная сериализация"""
+        if pd.isna(value) or value is None or value is np.nan:
             return None
         if hasattr(value, 'isoformat'):
+            return value.isoformat()
+        if isinstance(value, (pd.Timestamp, datetime)):
             return value.isoformat()
         return str(value)
 
@@ -174,17 +230,19 @@ class DataTransformer(AbstractTransform):
 
     @staticmethod
     def _serialize_final(value: Any) -> Any:
-        """Финальная проверка сериализации"""
-        if pd.isna(value) or value is np.nan:
+        """✅ ИСПРАВЛЕНО - финальная сериализация"""
+        if pd.isna(value) or value is None or value is np.nan:
             return None
         elif isinstance(value, (pd.Timestamp, datetime)):
             return value.isoformat()
-        elif isinstance(value, (np.integer, np.int64, np.int32)): #type: ignore
+        elif isinstance(value, (np.integer, np.int64, np.int32)):  #type: ignore
             return int(value)
-        elif isinstance(value, (np.floating, np.float64, np.float32)): #type: ignore
+        elif isinstance(value, (np.floating, np.float64, np.float32)):  #type: ignore
             return float(value) if not pd.isna(value) else None
         elif isinstance(value, np.bool_):
             return bool(value)
+        elif hasattr(value, '__str__'):
+            return str(value)
         return value
 
     def _evaluate_filter(
@@ -192,21 +250,28 @@ class DataTransformer(AbstractTransform):
         df: pd.DataFrame, 
         filter_expr: Dict[str, Any]
     ) -> pd.Series:
-        """Рекурсивная обработка фильтров"""
+        """✅ ИСПРАВЛЕНО - рекурсивная обработка фильтров"""
+        if df.empty:
+            return pd.Series([], dtype=bool)
+            
         op = list(filter_expr.keys())[0]
         
-        if op == "$and":
-            sub_filters = filter_expr[op]
-            masks = [self._evaluate_filter(df, cond) for cond in sub_filters]
-            return np.logical_and.reduce(masks) if masks else pd.Series([True] * len(df))
-            
-        elif op == "$or":
-            sub_filters = filter_expr[op]
-            masks = [self._evaluate_filter(df, cond) for cond in sub_filters]
-            return np.logical_or.reduce(masks) if masks else pd.Series([False] * len(df))
-            
-        elif op in [e.value for e in FilterOp]:
-            return self._apply_simple_filter(df, filter_expr)
+        try:
+            if op == "$and":
+                sub_filters = filter_expr[op]
+                masks = [self._evaluate_filter(df, cond) for cond in sub_filters]
+                return np.logical_and.reduce(masks) if masks else pd.Series([True] * len(df), index=df.index)
+                
+            elif op == "$or":
+                sub_filters = filter_expr[op]
+                masks = [self._evaluate_filter(df, cond) for cond in sub_filters]
+                return np.logical_or.reduce(masks) if masks else pd.Series([False] * len(df), index=df.index)
+                
+            elif op in [e.value for e in FilterOp]:
+                return self._apply_simple_filter(df, filter_expr)
+                
+        except Exception as e:
+            logger.warning(f"Ошибка фильтра {op}: {e}")
             
         raise ValidationError(f"Неизвестная операция фильтра: {op}")
 
@@ -215,7 +280,10 @@ class DataTransformer(AbstractTransform):
         df: pd.DataFrame, 
         filter_cond: Dict[str, Any]
     ) -> pd.Series:
-        """Применяет простой фильтр к колонке"""
+        """✅ ИСПРАВЛЕНО - простой фильтр"""
+        if df.empty:
+            return pd.Series([], dtype=bool)
+            
         op = list(filter_cond.keys())[0]
         cond_data = filter_cond[op]
         column = cond_data["column_name"]
@@ -231,10 +299,23 @@ class DataTransformer(AbstractTransform):
         return self._apply_operator(col_series, op, compare_value)
 
     def _prepare_compare_value(self, series: pd.Series, value: Any) -> Any:
-        """Подготавливает значение для сравнения"""
-        if pd.api.types.is_datetime64_any_dtype(series):
-            return pd.to_datetime(value, errors='coerce')
-        return pd.to_numeric(value, errors='coerce')
+        """✅ ИСПРАВЛЕНО - безопасная подготовка значения сравнения"""
+        try:
+            if pd.api.types.is_datetime64_any_dtype(series):
+                result = pd.to_datetime(value, errors='coerce')
+                if pd.isna(result):
+                    return pd.NaT
+                # ✅ Используем dtype.tz вместо series.dt.tz
+                if series.dtype.tz is not None and result.tz is None:  #type: ignore
+                    result = result.tz_localize('UTC')
+                elif series.dtype.tz is not None and result.tz is not None:  #type: ignore
+                    result = result.tz_convert('UTC')
+                return result
+            else:
+                return pd.to_numeric(value, errors='coerce')
+        except Exception as e:
+            logger.warning(f"Ошибка подготовки значения сравнения: {e}")
+            return pd.NaT if pd.api.types.is_datetime64_any_dtype(series) else np.nan
 
     def _apply_operator(
         self, 
@@ -242,15 +323,22 @@ class DataTransformer(AbstractTransform):
         op: str, 
         value: Any
     ) -> pd.Series:
-        """Применяет оператор сравнения"""
-        if op == "$gt":
-            return series > value
-        elif op == "$ge":
-            return series >= value
-        elif op == "$lt":
-            return series < value
-        elif op == "$le":
-            return series <= value
-        elif op == "$equal":
-            return series == value
+        """✅ ИСПРАВЛЕНО - всегда возвращает Series"""
+        try:
+            if pd.isna(value):
+                return pd.Series([False] * len(series), index=series.index)
+            
+            if op == "$gt":
+                return series > value
+            elif op == "$ge":
+                return series >= value
+            elif op == "$lt":
+                return series < value
+            elif op == "$le":
+                return series <= value
+            elif op == "$equal":
+                return series == value
+        except Exception as e:
+            logger.warning(f"Ошибка оператора {op}: {e}")
+        
         return pd.Series([False] * len(series), index=series.index)

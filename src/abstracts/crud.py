@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from schema.mapping import Map
-from .db import AbstractExtractor
+from src.schema.mapping import Map
+from src.abstracts.db import AbstractExtractor
 
 
 class AbstractCRUD(ABC):

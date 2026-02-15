@@ -1,0 +1,115 @@
+{
+  "test_users": {
+    "old_table_name": "test_users",
+    "fields": {
+      "user_id": {
+        "options": {
+          "$copy": "id"
+        }
+      },
+      "user_name": {
+        "options": {
+          "$copy": "username"
+        }
+      },
+      "full_info": {
+        "options": {
+          "$to_json": ["username", "email", "created_at"]
+        }
+      },
+      "registration_date": {
+        "options": {
+          "$copy": "created_at"
+        }
+      },
+      "max_user_score": {
+        "options": {
+          "$copy": "score"
+        }
+      }
+    },
+    "options": {    
+        "$and": [
+          {
+            "$gt": {
+              "column_name": "created_at",
+              "value": "2024-01-01T00:00:00"
+            }
+          },
+          {
+            "$lt": {
+              "column_name": "score",
+              "value": 1000
+            }
+          }
+        ]
+    }
+  },
+  "test_orders": {
+    "old_table_name": "test_orders",
+    "fields": {
+      "order_id": {
+        "options": {
+          "$copy": "id"
+        }
+      },
+      "customer_name": {
+        "options": {
+          "$copy": "customer_name"
+        }
+      },
+      "order_date": {
+        "options": {
+          "$copy": "order_date"
+        }
+      },
+      "total_amount": {
+        "options": {
+          "$copy": "amount"
+        }
+      },
+      "order_summary": {
+        "options": {
+          "$to_json": ["customer_name", "amount", "order_date"]
+        }
+      }
+    },
+    "options": {
+        "$gt": {
+          "column_name": "order_date",
+          "value": "2025-01-01T00:00:00"
+        }
+    }
+  },
+  "test_products": {
+    "old_table_name": "test_products",
+    "fields": {
+      "product_id": {
+        "options": {
+          "$copy": "id"
+        }
+      },
+      "product_name": {
+        "options": {
+          "$copy": "name"
+        }
+      },
+      "price": {
+        "options": {
+          "$copy": "price"
+        }
+      },
+      "category": {
+        "options": {
+          "$copy": "category"
+        }
+      },
+      "min_price": {
+        "options": {
+          "$min": "price"
+        }
+      }
+    },
+    "options": {}
+  }
+}

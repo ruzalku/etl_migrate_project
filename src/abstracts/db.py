@@ -24,6 +24,7 @@ class BaseStorage(Generic[TClient]):
         self.cdc = cdc
         self.update_row = update_row
         self.mode = cdc_mode
+        self.pk_col = pk_col
 
 
 class AsyncAbstractExtractor(ABC, BaseStorage[TClient]):
@@ -39,7 +40,7 @@ class AsyncAbstractExtractor(ABC, BaseStorage[TClient]):
         pass
 
     @abstractmethod
-    async def get_objs(self) -> ObjList:
+    async def get_objs(self, index: str) -> ObjList:
         """Получние объектов из storage"""
         pass
     
@@ -75,7 +76,7 @@ class AbstractExtractor(ABC, BaseStorage[TClient]):
         pass
 
     @abstractmethod
-    def get_objs(self) -> ObjList:
+    def get_objs(self, index: str) -> ObjList:
         """Получние объектов из storage"""
         pass
     

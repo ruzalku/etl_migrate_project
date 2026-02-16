@@ -1,9 +1,55 @@
 from functools import wraps
 from asyncio import sleep
+import time
 from random import normalvariate
 import logging
 
 logger = logging.getLogger(__name__)
+
+def async_backoff(
+    start_time: float = 2,
+    end_time: float = 600,
+    factor: float = 2,
+    jitter: float = 0.1,
+    max_attempts: int = 10,
+    exceptions: tuple[type[Exception], ...] = (Exception, )
+):
+    """
+    Асинхронный декоратор для exponential backoff.
+    Следующая задержка расчитывается по формуле:
+    cur_delay = cur_delay * factor
+    delay (задержка) = cur_delay + нормальное расперделение(jitter * cur_delay)
+    
+    В начале время delay = start_time.
+    Работает до max_attempts.
+    Если cur_delay > end_time, то задержка будет end_time + нормальное распределение(jitter * cur_delay)
+    """
+    def func_wrapper(func):
+        @wraps(func)
+        async def inner(*args, **kwargs):
+            cur_delay = start_time
+            counter = 0
+            
+            while counter <= max_attempts:
+                try:
+                    return await func(*args, **kwargs)
+                except exceptions as e:
+                    counter += 1
+                    jitter_time = normalvariate(mu=cur_delay, sigma=jitter * cur_delay)
+                    delay = cur_delay + jitter_time
+                    
+                    logger.error(
+                        f'Исключение: {counter}, '
+                        f'пауза: {delay}'
+                    )
+                    
+                    await sleep(delay=delay)
+                    
+                    cur_delay = min(cur_delay * factor, end_time)
+        
+        return inner
+    return func_wrapper
+
 
 def backoff(
     start_time: float = 2,
@@ -25,14 +71,14 @@ def backoff(
     """
     def func_wrapper(func):
         @wraps(func)
-        async def inner(*args, **kwargs):
+        def inner(*args, **kwargs):
             cur_delay = start_time
             counter = 0
             
             while counter <= max_attempts:
                 try:
-                    return await func(*args, **kwargs)
-                except Exception as e:
+                    return func(*args, **kwargs)
+                except exceptions as e:
                     counter += 1
                     jitter_time = normalvariate(mu=cur_delay, sigma=jitter * cur_delay)
                     delay = cur_delay + jitter_time
@@ -41,13 +87,10 @@ def backoff(
                         f'Исключение: {counter}, '
                         f'пауза: {delay}'
                     )
-                    print(e)
                     
-                    await sleep(delay=delay)
+                    time.sleep(delay)
                     
                     cur_delay = min(cur_delay * factor, end_time)
         
         return inner
     return func_wrapper
-                    
-                    

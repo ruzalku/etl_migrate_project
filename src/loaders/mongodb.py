@@ -2,7 +2,7 @@ from pymongo import AsyncMongoClient
 
 from src.schema.obj import ObjList
 from src.abstracts.db import AsyncAbstractLoader
-from src.core.backoff import backoff
+from src.core.backoff import async_backoff as backoff
 
 
 class Loader(AsyncAbstractLoader[AsyncMongoClient]):

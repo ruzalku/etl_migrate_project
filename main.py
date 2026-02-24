@@ -1,18 +1,9 @@
 import asyncio
-import importlib
 import logging
-from typing import Dict, List, Optional, Any, cast
 
-from src.schema.mapping import Map, IndexInfo
-from src.crud.mapping import MappingCRUD
-from src.abstracts.db import (
-    AsyncAbstractExtractor, AsyncAbstractLoader, 
-    AbstractExtractor, AbstractLoader
-)
-from src.abstracts.transform import AbstractTransform
-from src.crud.json_state import JSONStateManager
 from src.schema.enums import Mode
 from src.utils.pipeline import PipelineOrchestrator
+from src.core.settings import settings
 
 
 async def main():
@@ -23,23 +14,14 @@ async def main():
     
     configs = {
         "extractor": {
-            "config": {
-                "host": "localhost",
-                "port": 5432,
-                "dbname": "test_db", 
-                "user": "postgres",
-                "password": "postgres",
-            },
-            "update_row": "created_at",
+            "config": settings.extractor_config,
+            "update_row": settings.update_row,
             "pk_col": "ctid",
             "cdc": True,
             "cdc_mode": Mode.TIMESTAMP
         },
         "loader": {
-            "config": {
-                "host": "127.0.0.1",
-                "port": 27017,
-            },
+            "config": settings.loader_config,
             "db_name": "testdb"
         },
         "transform": {

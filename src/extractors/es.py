@@ -7,7 +7,7 @@ from schema.mapping import Map, FieldInfo
 from schema.obj import ObjList
 from schema.enums import Mode
 from src.crud.json_state import JSONStateManager
-from src.core.backoff import backoff
+from src.core.backoff import async_backoff as backoff
 
 
 class Storage(AsyncAbstractExtractor[AsyncElasticsearch]):

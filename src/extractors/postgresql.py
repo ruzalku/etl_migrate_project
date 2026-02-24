@@ -9,7 +9,7 @@ from src.abstracts.db import AsyncAbstractExtractor
 from src.crud.json_state import JSONStateManager
 from src.schema.enums import Mode
 from src.schema.errors import UnsupportedMode
-from src.core.backoff import backoff
+from src.core.backoff import async_backoff as backoff
 
 
 class Storage(AsyncAbstractExtractor[AsyncConnection]):

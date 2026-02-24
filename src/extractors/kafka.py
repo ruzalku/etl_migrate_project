@@ -9,7 +9,7 @@ from src.abstracts.db import AsyncAbstractExtractor
 from src.schema.errors import UnsupportedMode
 from src.schema.enums import Mode
 from src.crud.json_state import JSONStateManager
-from src.core.backoff import backoff
+from src.core.backoff import async_backoff as backoff
 
 
 logger = logging.getLogger(__name__)
